@@ -4,7 +4,7 @@ extraction:
       packages:
         - cargo
     after_prepare:
-    - apt install libssl-dev
+      - apt install libssl-dev
       - git clone --depth 1 https://github.com/OISF/libhtp.git
       - cargo install cargo-update
       - cargo install-update -a
