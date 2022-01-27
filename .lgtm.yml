@@ -5,5 +5,6 @@ extraction:
         - cargo
     after_prepare:
       - git clone --depth 1 https://github.com/OISF/libhtp.git
+      - curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.34.2 -y
       - cargo install --force --debug --version 0.14.1 cbindgen
       - export PATH=/opt/work/.cargo/bin:$PATH
