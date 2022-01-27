@@ -5,6 +5,7 @@ extraction:
         - cargo
     after_prepare:
       - git clone --depth 1 https://github.com/OISF/libhtp.git
+      - apt-get remove rustc
       - curl https://sh.rustup.rs -sSf | sh -s -- -y
       - rustup update
       - cargo install --force --debug --version 0.14.1 cbindgen
