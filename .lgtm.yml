@@ -4,8 +4,8 @@ extraction:
       packages:
         - cargo
         - libssl-dev
-        - rustup
     after_prepare:
+      - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
       - git clone --depth 1 https://github.com/OISF/libhtp.git
       - cargo install cargo-update
       - cargo install-update -a
