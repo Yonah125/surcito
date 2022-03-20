@@ -18,9 +18,9 @@
 use crate::applayer::*;
 use crate::core::{self, *};
 use crate::dcerpc::parser;
-use nom::error::ErrorKind;
-use nom::number::Endianness;
-use nom;
+use nom7::error::{Error, ErrorKind};
+use nom7::number::Endianness;
+use nom7::{Err, IResult, Needed};
 use std;
 use std::cmp;
 use std::ffi::CString;
@@ -306,8 +306,6 @@ pub struct DCERPCState {
     pub query_completed: bool,
     pub data_needed_for_dir: Direction,
     pub prev_dir: Direction,
-    pub prev_tx_call_id: u32,
-    pub clear_bind_cache: bool,
     pub ts_gap: bool,
     pub tc_gap: bool,
     pub ts_ssn_gap: bool,
@@ -526,19 +524,6 @@ impl DCERPCState {
         None
     }
 
-    pub fn handle_bind_cache(&mut self, call_id: u32, is_response: bool) {
-        if self.clear_bind_cache == true {
-            self.bind = None;
-            self.bindack = None;
-        }
-        if self.prev_tx_call_id == call_id && is_response == true {
-            self.clear_bind_cache = true;
-        } else {
-            self.clear_bind_cache = false;
-        }
-        self.prev_tx_call_id = call_id;
-    }
-
     pub fn parse_data_gap(&mut self, direction: Direction) -> AppLayerResult {
         match direction {
             Direction::ToServer => {
@@ -590,7 +575,7 @@ impl DCERPCState {
         }
     }
 
-    pub fn search_dcerpc_record<'a>(&mut self, i: &'a[u8]) -> nom::IResult<&'a[u8], &'a[u8]> {
+    pub fn search_dcerpc_record<'a>(&mut self, i: &'a[u8]) -> IResult<&'a[u8], &'a[u8]> {
         let mut d = i;
         while d.len() >= 2 {
             if d[0] == 0x05 && d[1] == 0x00 {
@@ -598,7 +583,7 @@ impl DCERPCState {
             }
             d = &d[1..];
         }
-        Err(nom::Err::Incomplete(nom::Needed::Size(2 as usize - d.len())))
+        Err(Err::Incomplete(Needed::new(2 as usize - d.len())))
     }
 
     /// Makes a call to the nom parser for parsing DCERPC Header.
@@ -628,12 +613,12 @@ impl DCERPCState {
                 self.header = Some(header);
                 (input.len() - leftover_bytes.len()) as i32
             }
-            Err(nom::Err::Incomplete(_)) => {
+            Err(Err::Incomplete(_)) => {
                 // Insufficient data.
                 SCLogDebug!("Insufficient data while parsing DCERPC header");
                 -1
             }
-            Err(nom::Err::Error(([], ErrorKind::Eof))) => {
+            Err(Err::Error(Error{code:ErrorKind::Eof, ..})) => {
                 SCLogDebug!("EoF reached while parsing DCERPC header");
                 -1
             }
@@ -667,7 +652,7 @@ impl DCERPCState {
                 }
                 (input.len() - leftover_bytes.len()) as i32
             }
-            Err(nom::Err::Incomplete(_)) => {
+            Err(Err::Incomplete(_)) => {
                 // Insufficient data.
                 SCLogDebug!("Insufficient data while parsing DCERPC BIND CTXItem");
                 -1
@@ -707,7 +692,7 @@ impl DCERPCState {
                 // of bindctxitems)
                 (input.len() - leftover_bytes.len()) as i32 + retval * numctxitems as i32
             }
-            Err(nom::Err::Incomplete(_)) => {
+            Err(Err::Incomplete(_)) => {
                 // Insufficient data.
                 SCLogDebug!("Insufficient data while parsing DCERPC BIND header");
                 -1
@@ -742,7 +727,7 @@ impl DCERPCState {
                 }
                 (input.len() - leftover_bytes.len()) as i32
             }
-            Err(nom::Err::Incomplete(_)) => {
+            Err(Err::Incomplete(_)) => {
                 // Insufficient data.
                 SCLogDebug!("Insufficient data while parsing DCERPC BINDACK");
                 -1
@@ -892,7 +877,7 @@ impl DCERPCState {
                 );
                 parsed
             }
-            Err(nom::Err::Incomplete(_)) => {
+            Err(Err::Incomplete(_)) => {
                 // Insufficient data.
                 SCLogDebug!("Insufficient data while parsing DCERPC REQUEST");
                 -1
@@ -1013,7 +998,6 @@ impl DCERPCState {
                     if retval == -1 {
                         return AppLayerResult::err();
                     }
-                    self.handle_bind_cache(current_call_id, false);
                 }
                 DCERPC_TYPE_BINDACK | DCERPC_TYPE_ALTER_CONTEXT_RESP => {
                     retval = self.process_bindack_pdu(&buffer[parsed as usize..]);
@@ -1034,7 +1018,6 @@ impl DCERPCState {
                     if let Some(flow) = self.flow {
                         sc_app_layer_parser_trigger_raw_stream_reassembly(flow, Direction::ToClient as i32);
                     }
-                    self.handle_bind_cache(current_call_id, false);
                 }
                 DCERPC_TYPE_REQUEST => {
                     retval = self.process_request_pdu(&buffer[parsed as usize..]);
@@ -1043,7 +1026,6 @@ impl DCERPCState {
                     }
                     // In case the response came first, the transaction would complete later when
                     // the corresponding request also comes through
-                    self.handle_bind_cache(current_call_id, false);
                 }
                 DCERPC_TYPE_RESPONSE => {
                     let transaction = self.get_tx_by_call_id(current_call_id, Direction::ToClient);
@@ -1065,7 +1047,6 @@ impl DCERPCState {
                     if retval < 0 {
                         return AppLayerResult::err();
                     }
-                    self.handle_bind_cache(current_call_id, true);
                 }
                 _ => {
                     SCLogDebug!("Unrecognized packet type: {:?}", x);

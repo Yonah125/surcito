@@ -1,4 +1,4 @@
-/* Copyright (C) 2013-2021 Open Information Security Foundation
+/* Copyright (C) 2013-2022 Open Information Security Foundation
  *
  * You can copy, redistribute or modify this Program under the terms of
  * the GNU General Public License version 2 as published by the Free
@@ -592,27 +592,38 @@ static void AlertAddFiles(const Packet *p, JsonBuilder *jb, const uint64_t tx_id
 
 static void AlertAddFrame(const Packet *p, JsonBuilder *jb, const int64_t frame_id)
 {
-    if (p->flow == NULL || p->flow->protoctx == NULL)
+    if (p->flow == NULL || (p->proto == IPPROTO_TCP && p->flow->protoctx == NULL))
         return;
 
     FramesContainer *frames_container = AppLayerFramesGetContainer(p->flow);
     if (frames_container == NULL)
         return;
 
-    Frames *frames;
-    TcpSession *ssn = p->flow->protoctx;
-    TcpStream *stream;
-    if (PKT_IS_TOSERVER(p)) {
-        stream = &ssn->client;
-        frames = &frames_container->toserver;
-    } else {
-        stream = &ssn->server;
-        frames = &frames_container->toclient;
-    }
-
-    Frame *frame = FrameGetById(frames, frame_id);
-    if (frame != NULL) {
-        FrameJsonLogOneFrame(frame, p->flow, stream, p, jb);
+    Frames *frames = NULL;
+    TcpStream *stream = NULL;
+    if (p->proto == IPPROTO_TCP) {
+        TcpSession *ssn = p->flow->protoctx;
+        if (PKT_IS_TOSERVER(p)) {
+            stream = &ssn->client;
+            frames = &frames_container->toserver;
+        } else {
+            stream = &ssn->server;
+            frames = &frames_container->toclient;
+        }
+        Frame *frame = FrameGetById(frames, frame_id);
+        if (frame != NULL) {
+            FrameJsonLogOneFrame(IPPROTO_TCP, frame, p->flow, stream, p, jb);
+        }
+    } else if (p->proto == IPPROTO_UDP) {
+        if (PKT_IS_TOSERVER(p)) {
+            frames = &frames_container->toserver;
+        } else {
+            frames = &frames_container->toclient;
+        }
+        Frame *frame = FrameGetById(frames, frame_id);
+        if (frame != NULL) {
+            FrameJsonLogOneFrame(IPPROTO_UDP, frame, p->flow, NULL, p, jb);
+        }
     }
 }
 

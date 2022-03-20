@@ -141,7 +141,10 @@ impl TelnetState {
         None
     }
 
-    fn parse_request(&mut self, flow: *const Flow, stream_slice: &StreamSlice, input: &[u8]) -> AppLayerResult {
+    // app-layer-frame-documentation tag start: parse_request
+    fn parse_request(
+        &mut self, flow: *const Flow, stream_slice: &StreamSlice, input: &[u8],
+    ) -> AppLayerResult {
         // We're not interested in empty requests.
         if input.len() == 0 {
             return AppLayerResult::ok();
@@ -163,26 +166,49 @@ impl TelnetState {
         let mut start = input;
         while start.len() > 0 {
             if self.request_frame.is_none() {
-                self.request_frame = Frame::new_ts(flow, stream_slice, start, -1 as i64, TelnetFrameType::Pdu as u8);
+                self.request_frame = Frame::new_ts(
+                    flow,
+                    stream_slice,
+                    start,
+                    -1 as i64,
+                    TelnetFrameType::Pdu as u8,
+                );
             }
             if self.request_specific_frame.is_none() {
                 if let Ok((_, is_ctl)) = parser::peek_message_is_ctl(start) {
                     let f = if is_ctl {
-                        Frame::new_ts(flow, stream_slice, start, -1 as i64, TelnetFrameType::Ctl as u8)
+                        Frame::new_ts(
+                            flow,
+                            stream_slice,
+                            start,
+                            -1 as i64,
+                            TelnetFrameType::Ctl as u8,
+                        )
                     } else {
-                        Frame::new_ts(flow, stream_slice, start, -1 as i64, TelnetFrameType::Data as u8)
+                        Frame::new_ts(
+                            flow,
+                            stream_slice,
+                            start,
+                            -1 as i64,
+                            TelnetFrameType::Data as u8,
+                        )
+                    // app-layer-frame-documentation tag end: parse_request
                     };
                     self.request_specific_frame = f;
                 }
             }
+            // app-layer-frame-documentation tag start: update frame_len
             match parser::parse_message(start) {
                 Ok((rem, request)) => {
                     let consumed = start.len() - rem.len();
-                    if rem.len() == start.len() { panic!("lockup"); }
+                    if rem.len() == start.len() {
+                        panic!("lockup");
+                    }
                     start = rem;
 
                     if let Some(frame) = &self.request_frame {
                         frame.set_len(flow, 0, consumed as i64);
+                        // app-layer-frame-documentation tag end: update frame_len
                         self.request_frame = None;
                     }
                     if let Some(frame) = &self.request_specific_frame {
@@ -194,22 +220,22 @@ impl TelnetState {
                         match self.state {
                             TelnetProtocolState::LoginSent => {
                                 self.state = TelnetProtocolState::LoginRecv;
-                            },
+                            }
                             TelnetProtocolState::PasswdSent => {
                                 self.state = TelnetProtocolState::PasswdRecv;
-                            },
+                            }
                             TelnetProtocolState::AuthOk => {
                                 let _message = std::str::from_utf8(&d);
                                 if let Ok(_message) = _message {
                                     SCLogDebug!("=> {}", _message);
                                 }
-                            },
-                            _ => {},
+                            }
+                            _ => {}
                         }
                     } else if let parser::TelnetMessageType::Control(_c) = request {
                         SCLogDebug!("request {:?}", _c);
                     }
-                },
+                }
                 Err(nom7::Err::Incomplete(_)) => {
                     // Not enough data. This parser doesn't give us a good indication
                     // of how much data is missing so just ask for one more byte so the
@@ -217,10 +243,10 @@ impl TelnetState {
                     let consumed = input.len() - start.len();
                     let needed = start.len() + 1;
                     return AppLayerResult::incomplete(consumed as u32, needed as u32);
-                },
+                }
                 Err(_) => {
                     return AppLayerResult::err();
-                },
+                }
             }
         }
 

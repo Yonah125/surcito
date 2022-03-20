@@ -730,6 +730,16 @@ waited for a detection thread. The remaining detection thread can
 become active.
 
 
+You can alter the per-thread stack-size if the default provided by
+your build system is too small. The default value is provided by
+your build system; we suggest setting the value to 8MB if the default
+value is too small.
+
+::
+
+  stack-size: 8MB
+
+
 In the option 'cpu affinity' you can set which CPU's/cores work on which
 thread. In this option there are several sets of threads. The management-,
 receive-, worker- and verdict-set. These are fixed names and can not be
@@ -1070,7 +1080,7 @@ parsers that do file extraction.
 
 Inspection of reassembled data is done in chunks. The size of these
 chunks is set with ``toserver_chunk_size`` and ``toclient_chunk_size``.
-To avoid making the borders predictable, the sizes van be varied by
+To avoid making the borders predictable, the sizes can be varied by
 adding in a random factor.
 
 ::
@@ -1374,6 +1384,28 @@ independent. The ``probing parsers`` will only run on the ``detection-ports``.
 
 SMB is commonly used to transfer the DCERPC protocol. This traffic is also handled by
 this parser.
+
+Configure HTTP2
+~~~~~~~~~~~~~~~
+
+HTTP2 has 2 parameters that can be customized.
+The point of these 2 parameters is to find a balance between the completeness
+of analysis and the resource consumption.
+
+`http2.max-table-size` refers to `SETTINGS_HEADER_TABLE_SIZE` from rfc 7540 section 6.5.2.
+Its default value is 4096 bytes, but it can be set to any uint32 by a flow.
+
+`http2.max-streams` refers to `SETTINGS_MAX_CONCURRENT_STREAMS` from rfc 7540 section 6.5.2.
+Its default value is unlimited.
+
+Maximum transactions
+~~~~~~~~~~~~~~~~~~~~
+
+MQTT, FTP, and NFS have each a `max-tx` parameter that can be customized.
+`max-tx` refers to the maximum number of live transactions for each flow.
+An app-layer event `protocol.too_many_transactions` is triggered when this value is reached.
+The point of this parameter is to find a balance between the completeness of analysis
+and the resource consumption.
 
 Engine Logging
 --------------

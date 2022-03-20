@@ -1,4 +1,4 @@
-/* Copyright (C) 2007-2021 Open Information Security Foundation
+/* Copyright (C) 2007-2022 Open Information Security Foundation
  *
  * You can copy, redistribute or modify this Program under the terms of
  * the GNU General Public License version 2 as published by the Free
@@ -306,6 +306,9 @@ static void SignalHandlerUnexpected(int sig_num, siginfo_t *info, void *context)
 {
     char msg[SC_LOG_MAX_LOG_MSG_LEN];
     unw_cursor_t cursor;
+    /* Restore defaults for signals to avoid loops */
+    signal(SIGABRT, SIG_DFL);
+    signal(SIGSEGV, SIG_DFL);
     int r;
     if ((r = unw_init_local(&cursor, (unw_context_t *)(context)) != 0)) {
         fprintf(stderr, "unable to obtain stack trace: unw_init_local: %s\n", unw_strerror(r));
@@ -338,9 +341,8 @@ static void SignalHandlerUnexpected(int sig_num, siginfo_t *info, void *context)
     SCLogError(SC_ERR_SIGNAL, "%s", msg);
 
 terminate:
-    // Terminate with SIGABRT ... but first, restore that signal's default handling
-    signal(SIGABRT, SIG_DFL);
-    abort();
+    // Propagate signal to watchers, if any
+    kill(0, sig_num);
 }
 #undef UNW_LOCAL_ONLY
 #endif /* HAVE_LIBUNWIND */
@@ -373,6 +375,7 @@ void GlobalsInitPreConfig(void)
     TimeInit();
     SupportFastPatternForSigMatchTypes();
     SCThresholdConfGlobalInit();
+    SCProtoNameInit();
 }
 
 static void GlobalsDestroy(SCInstance *suri)
@@ -400,6 +403,7 @@ static void GlobalsDestroy(SCInstance *suri)
     LiveDeviceListClean();
     OutputDeregisterAll();
     FeatureTrackingRelease();
+    SCProtoNameRelease();
     TimeDeinit();
     if (!suri->disabled_detect) {
         SCReferenceConfDeinit();
@@ -1075,9 +1079,9 @@ static void SCInstanceInit(SCInstance *suri, const char *progname)
     suri->group_name = NULL;
     suri->do_setuid = FALSE;
     suri->do_setgid = FALSE;
+#endif /* OS_WIN32 */
     suri->userid = 0;
     suri->groupid = 0;
-#endif /* OS_WIN32 */
     suri->delayed_detect = 0;
     suri->daemon = 0;
     suri->offline = 0;
@@ -1212,6 +1216,11 @@ static int ParseCommandLineDpdk(SCInstance *suri, const char *in_arg)
 
 static int ParseCommandLinePcapLive(SCInstance *suri, const char *in_arg)
 {
+#if defined(OS_WIN32) && !defined(HAVE_LIBWPCAP)
+    /* If running on Windows without Npcap, bail early as live capture is not supported. */
+    FatalError(SC_ERR_FATAL,
+            "Live capture not available. To support live capture compile against Npcap.");
+#endif
     memset(suri->pcap_dev, 0, sizeof(suri->pcap_dev));
 
     if (in_arg != NULL) {
@@ -2046,34 +2055,10 @@ static int MayDaemonize(SCInstance *suri)
     return TM_ECODE_OK;
 }
 
-static int InitSignalHandler(SCInstance *suri)
+/* Initialize the user and group Suricata is to run as. */
+static int InitRunAs(SCInstance *suri)
 {
-    /* registering signals we use */
-#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
-    UtilSignalHandlerSetup(SIGINT, SignalHandlerSigint);
-    UtilSignalHandlerSetup(SIGTERM, SignalHandlerSigterm);
-#if HAVE_LIBUNWIND
-    int enabled;
-    if (ConfGetBool("logging.stacktrace-on-signal", &enabled) == 0) {
-        enabled = 1;
-    }
-
-    if (enabled) {
-        SCLogInfo("Preparing unexpected signal handling");
-        struct sigaction stacktrace_action;
-        memset(&stacktrace_action, 0, sizeof(stacktrace_action));
-        stacktrace_action.sa_sigaction = SignalHandlerUnexpected;
-        stacktrace_action.sa_flags = SA_SIGINFO;
-        sigaction(SIGSEGV, &stacktrace_action, NULL);
-        sigaction(SIGABRT, &stacktrace_action, NULL);
-    }
-#endif /* HAVE_LIBUNWIND */
-#endif
 #ifndef OS_WIN32
-    UtilSignalHandlerSetup(SIGHUP, SignalHandlerSigHup);
-    UtilSignalHandlerSetup(SIGPIPE, SIG_IGN);
-    UtilSignalHandlerSetup(SIGSYS, SIG_IGN);
-
     /* Try to get user/group to run suricata as if
        command line as not decide of that */
     if (suri->do_setuid == FALSE && suri->do_setgid == FALSE) {
@@ -2105,6 +2090,37 @@ static int InitSignalHandler(SCInstance *suri)
 
         sc_set_caps = TRUE;
     }
+#endif
+    return TM_ECODE_OK;
+}
+
+static int InitSignalHandler(SCInstance *suri)
+{
+    /* registering signals we use */
+#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+    UtilSignalHandlerSetup(SIGINT, SignalHandlerSigint);
+    UtilSignalHandlerSetup(SIGTERM, SignalHandlerSigterm);
+#if HAVE_LIBUNWIND
+    int enabled;
+    if (ConfGetBool("logging.stacktrace-on-signal", &enabled) == 0) {
+        enabled = 1;
+    }
+
+    if (enabled) {
+        SCLogInfo("Preparing unexpected signal handling");
+        struct sigaction stacktrace_action;
+        memset(&stacktrace_action, 0, sizeof(stacktrace_action));
+        stacktrace_action.sa_sigaction = SignalHandlerUnexpected;
+        stacktrace_action.sa_flags = SA_SIGINFO;
+        sigaction(SIGSEGV, &stacktrace_action, NULL);
+        sigaction(SIGABRT, &stacktrace_action, NULL);
+    }
+#endif /* HAVE_LIBUNWIND */
+#endif
+#ifndef OS_WIN32
+    UtilSignalHandlerSetup(SIGHUP, SignalHandlerSigHup);
+    UtilSignalHandlerSetup(SIGPIPE, SIG_IGN);
+    UtilSignalHandlerSetup(SIGSYS, SIG_IGN);
 #endif /* OS_WIN32 */
 
     return TM_ECODE_OK;
@@ -2615,8 +2631,7 @@ int PostConfLoadedSetup(SCInstance *suri)
     const char *custom_umask;
     if (ConfGet("umask", &custom_umask) == 1) {
         uint16_t mask;
-        if (StringParseUint16(&mask, 8, strlen(custom_umask),
-                                    custom_umask) > 0) {
+        if (StringParseUint16(&mask, 8, (uint16_t)strlen(custom_umask), custom_umask) > 0) {
             umask((mode_t)mask);
         }
     }
@@ -2649,8 +2664,6 @@ int PostConfLoadedSetup(SCInstance *suri)
     SigTableSetup(); /* load the rule keywords */
     SigTableApplyStrictCommandlineOption(suri->strict_rule_parsing_string);
     TmqhSetup();
-
-    CIDRInit();
 
     TagInitCtx();
     PacketAlertTagInit();
@@ -2876,10 +2889,11 @@ int SuricataMain(int argc, char **argv)
     SCLogDebug("vlan tracking is %s", vlan_tracking == 1 ? "enabled" : "disabled");
 
     SetupUserMode(&suricata);
+    InitRunAs(&suricata);
 
     /* Since our config is now loaded we can finish configurating the
      * logging module. */
-    SCLogLoadConfig(suricata.daemon, suricata.verbose);
+    SCLogLoadConfig(suricata.daemon, suricata.verbose, suricata.userid, suricata.groupid);
 
     LogVersion(&suricata);
     UtilCpuPrintSummary();

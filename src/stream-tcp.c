@@ -86,14 +86,6 @@
 #define STREAMTCP_DEFAULT_TOCLIENT_CHUNK_SIZE   2560
 #define STREAMTCP_DEFAULT_MAX_SYNACK_QUEUED     5
 
-#define STREAMTCP_NEW_TIMEOUT                   60
-#define STREAMTCP_EST_TIMEOUT                   3600
-#define STREAMTCP_CLOSED_TIMEOUT                120
-
-#define STREAMTCP_EMERG_NEW_TIMEOUT             10
-#define STREAMTCP_EMERG_EST_TIMEOUT             300
-#define STREAMTCP_EMERG_CLOSED_TIMEOUT          20
-
 static int StreamTcpHandleFin(ThreadVars *tv, StreamTcpThread *, TcpSession *, Packet *, PacketQueueNoLock *);
 void StreamTcpReturnStreamSegments (TcpStream *);
 void StreamTcpInitConfig(bool);
@@ -696,7 +688,8 @@ static TcpSession *StreamTcpNewSession (Packet *p, int id)
     TcpSession *ssn = (TcpSession *)p->flow->protoctx;
 
     if (ssn == NULL) {
-        p->flow->protoctx = PoolThreadGetById(ssn_pool, id);
+        DEBUG_VALIDATE_BUG_ON(id < 0 || id > UINT16_MAX);
+        p->flow->protoctx = PoolThreadGetById(ssn_pool, (uint16_t)id);
 #ifdef DEBUG
         SCMutexLock(&ssn_pool_mutex);
         if (p->flow->protoctx != NULL)
@@ -775,7 +768,7 @@ void StreamTcpSetOSPolicy(TcpStream *stream, Packet *p)
            packets */
         ret = SCHInfoGetIPv4HostOSFlavour((uint8_t *)GET_IPV4_DST_ADDR_PTR(p));
         if (ret > 0)
-            stream->os_policy = ret;
+            stream->os_policy = (uint8_t)ret;
         else
             stream->os_policy = OS_POLICY_DEFAULT;
 
@@ -785,7 +778,7 @@ void StreamTcpSetOSPolicy(TcpStream *stream, Packet *p)
            packets */
         ret = SCHInfoGetIPv6HostOSFlavour((uint8_t *)GET_IPV6_DST_ADDR(p));
         if (ret > 0)
-            stream->os_policy = ret;
+            stream->os_policy = (uint8_t)ret;
         else
             stream->os_policy = OS_POLICY_DEFAULT;
     }
