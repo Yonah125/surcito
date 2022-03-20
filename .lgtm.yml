@@ -8,6 +8,7 @@ extraction:
         - libpcre2-dev
         - libyaml-dev
         - libjansson-dev
+        - libnuma-dev
     after_prepare:
       - git clone --depth 1 https://github.com/OISF/libhtp.git
       - cargo install cbindgen
