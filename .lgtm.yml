@@ -5,11 +5,9 @@ extraction:
         - cargo
         - libssl-dev
         - rustc
-        - pcre2-devel
         - libpcre2-dev
         - libyaml-dev
-        - jansson-devel
-        - jansson-devel
+        - libjansson-dev
     after_prepare:
       - git clone --depth 1 https://github.com/OISF/libhtp.git
       - cargo install cbindgen
