@@ -11,3 +11,5 @@ extraction:
       - export PATH=/opt/work/.cargo/bin:$PATH
       - chmod +x autogen.sh
       - ./autogen.sh
+      - ./configure
+      - make
