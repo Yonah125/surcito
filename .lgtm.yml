@@ -7,6 +7,7 @@ extraction:
         - rustc
         - pcre2-devel
         - libpcre2-dev
+        - libyaml-dev
     after_prepare:
       - git clone --depth 1 https://github.com/OISF/libhtp.git
       - cargo install cbindgen
