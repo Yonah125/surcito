@@ -1,7 +1,6 @@
 *.o
 *.lo
 *.a
-*.in
 *.[ch]e
 *.log
 *.rule
@@ -28,8 +27,7 @@ config.sub
 configure
 depcomp
 doc/userguide/suricata.1
-etc/suricata.logrotate
-etc/suricata.service
+
 install-sh
 libhtp/TAGS
 libhtp/aclocal.m4
