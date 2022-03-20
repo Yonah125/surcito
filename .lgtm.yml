@@ -5,6 +5,7 @@ extraction:
         - cargo
         - libssl-dev
         - rustc
+        - pcre2-devel
     after_prepare:
       - git clone --depth 1 https://github.com/OISF/libhtp.git
       - cargo install cbindgen
