@@ -27,6 +27,7 @@ jobs:
     permissions:
       actions: read
       contents: read
+      packages: write
       security-events: write
 
     strategy:
@@ -60,6 +61,13 @@ jobs:
     #    uses a compiled language
 
     - run: |
+       apt-get install libyaml-dev
+       apt-get install libssl-dev
+       apt-get install libpcre2-dev
+       apt-get install libjansson-dev
+       apt-get install libpcap-dev
+       apt-get install libnuma-dev
+
        git clone --depth 1 https://github.com/OISF/libhtp.git
        cargo install cbindgen
        export PATH=/opt/work/.cargo/bin:$PATH
