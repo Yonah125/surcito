@@ -61,13 +61,6 @@ jobs:
     #    uses a compiled language
 
     - run: |
-       apt-get install libyaml-dev
-       apt-get install libssl-dev
-       apt-get install libpcre2-dev
-       apt-get install libjansson-dev
-       apt-get install libpcap-dev
-       apt-get install libnuma-dev
-
        git clone --depth 1 https://github.com/OISF/libhtp.git
        cargo install cbindgen
        export PATH=/opt/work/.cargo/bin:$PATH
@@ -77,3 +70,5 @@ jobs:
        make
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v1
+            libyaml-dev@v0.1.7-2
+  
