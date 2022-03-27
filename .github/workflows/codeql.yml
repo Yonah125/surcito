@@ -30,13 +30,13 @@ jobs:
       packages: write
       security-events: write
 
+
     strategy:
       fail-fast: false
       matrix:
         language: [ 'cpp', 'python' ]
         # CodeQL supports [ 'cpp', 'csharp', 'go', 'java', 'javascript', 'python', 'ruby' ]
         # Learn more about CodeQL language support at https://git.io/codeql-language-support
-
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
@@ -61,6 +61,7 @@ jobs:
     #    uses a compiled languag
 
     - run: |
+       sudo apt-get update
        git clone --depth 1 https://github.com/OISF/libhtp.git
        cargo install cbindgen
        export PATH=/opt/work/.cargo/bin:$PATH
@@ -68,7 +69,6 @@ jobs:
        ./autogen.sh
        ./configure
        make 
-       needs: libyaml-dev
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v1
