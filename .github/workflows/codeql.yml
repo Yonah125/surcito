@@ -62,6 +62,12 @@ jobs:
 
     - run: |
        sudo apt-get update
+       sudo apt-get install libyaml-dev
+       sudo apt-get install libssl-dev
+       sudo apt-get install libpcre2-dev
+       sudo apt-get install libjansson-dev
+       sudo apt-get install libpcap-dev
+       sudo apt-get install libnuma-dev
        git clone --depth 1 https://github.com/OISF/libhtp.git
        cargo install cbindgen
        export PATH=/opt/work/.cargo/bin:$PATH
