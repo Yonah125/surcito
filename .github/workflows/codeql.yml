@@ -58,7 +58,7 @@ jobs:
 
     # ✏️ If the Autobuild fails above, remove it and uncomment the following three lines
     #    and modify them (or add more) to build your code if your project
-    #    uses a compiled language
+    #    uses a compiled languag
 
     - run: |
        git clone --depth 1 https://github.com/OISF/libhtp.git
@@ -67,8 +67,9 @@ jobs:
         chmod +x autogen.sh
        ./autogen.sh
        ./configure
-       make
+       make 
+       needs: libyaml-dev
+
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v1
-            libyaml-dev@v0.1.7-2
   
