@@ -24,6 +24,7 @@ jobs:
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
+    continue-on-error: true
     permissions:
       actions: read
       contents: read
@@ -78,8 +79,4 @@ jobs:
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v1
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@f32b3a3741e1053eb607407145bc9619351dc93b
-      with:
-        fail_ci_if_error: false
-  
+ 
