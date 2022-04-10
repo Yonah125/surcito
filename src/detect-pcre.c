@@ -266,9 +266,8 @@ int DetectPcrePayloadMatch(DetectEngineThreadCtx *det_ctx, const Signature *s,
                         capture_len = (capture_len < 0xffff) ? (uint16_t)capture_len : 0xffff;
                         uint8_t *str_ptr2 = SCMalloc(capture_len);
                         if (unlikely(str_ptr2 == NULL)) {
-                            SCFree(str_ptr);
-                            pcre2_substring_free((PCRE2_UCHAR8 *)pcre2_str_ptr2);
-                            break;
+                            pcre2_substring_free((PCRE2_UCHAR8 *)pcre2_str_ptr);
+                            continue;
                         }
                         memcpy(str_ptr2, pcre2_str_ptr2, capture_len);
                         pcre2_substring_free((PCRE2_UCHAR8 *)pcre2_str_ptr2);
